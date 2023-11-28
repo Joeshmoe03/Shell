@@ -88,11 +88,12 @@ int main(int argc, char *argv[]) {
 	int i;
 
 	for(i = 0; i <= tokenCnt; i++) {
-		//if token == "|" -> do thing with all previous tokens since last thing done?
-		//if token == ">>"
-		//if token == ">"
-		//if token == "<"
-		//printf("%s\n", tokens[i]);
+		//if token == "|"  -> do thing with all previous tokens since last thing done?
+		//if token == ">>" ->
+		//if token == ">"  ->
+		//if token == "<"  ->
+		//exec the shell again
+														//printf("%s\n", tokens[i]);
 	}	
 
 	/* function for error checking */
