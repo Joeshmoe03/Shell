@@ -80,12 +80,49 @@ char** parseInp(char* shellInp, int* tokenCntAddr) {
 	return tokens;
 }
 
+/* function for input redirection */
+void inputredirect(char **tokens) {
+	__pid_t child_pid, exit_pid;
+	int exit_value;
+
+	child_pid = fork();
+
+	/* child does all the work */
+	if(child_pid == 0) {
+		/*if multiple redirects (<) call program on each one */
+		/* if multiple things to redirect, it ignores the first redirect? */
+		
+	} else { /* parent waits for child to be done*/
+		exit_pid = wait(&exit_value);
+	}	
+}
+
+
+
+/* basic functionality */
+void basicfunc(char **tokens) {
+			__pid_t child_pid, exit_pid;
+	int exit_value;
+
+	child_pid = fork();
+
+	/* child does all the work */
+	if(child_pid == 0) {
+		execvp(tokens[0], tokens);
+		
+	} else { /* parent waits for child to be done*/
+		exit_pid = wait(&exit_value);
+	}	
+}
+
 
 int main(int argc, char *argv[]) {
 	char* shellInp = readInp();
 	int tokenCnt = 0;
 	char** tokens = parseInp(shellInp, &tokenCnt);
 	int i;
+
+		basicfunc(tokens);
 
 	for(i = 0; i <= tokenCnt; i++) {
 		//if token == "|"  -> do thing with all previous tokens since last thing done?
