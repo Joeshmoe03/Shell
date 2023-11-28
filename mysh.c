@@ -29,7 +29,7 @@ char* readInp(void) {
 	}
 }
 
-char** parseInp(char* shellInp, int* countAddr) {
+char** parseInp(char* shellInp, int* tokenCntAddr) {
 	
 	/* Assumed initial number of tokens that will be parsed. Realloc if necessary. */
 	int tokenIdx = 0;
@@ -45,7 +45,8 @@ char** parseInp(char* shellInp, int* countAddr) {
 	/* It's token time >:D */
 	token = strtok(shellInp, TOKEN_DELIM);
 	while(token != NULL) {
-		
+		*tokenCntAddr = tokenIdx;
+
 		/* Realloc tokens if necessary */
 		if(tokenIdx > tokenNum) {
 			tmpTokenNum = tokenNum * 2;
@@ -76,19 +77,22 @@ char** parseInp(char* shellInp, int* countAddr) {
 		token = strtok(NULL, TOKEN_DELIM);
 		tokenIdx++;
 	}
-	*countAddr = tokenIdx;
 	return tokens;
 }
 
 
 int main(int argc, char *argv[]) {
-	char* s = readInp();
-	int count = 0;
-	char** parsed_s = parseInp(s, &count);
+	char* shellInp = readInp();
+	int tokenCnt = 0;
+	char** tokens = parseInp(shellInp, &tokenCnt);
 	int i;
 
-	for(i = 0; i < count; i++) {
-		printf("%s\n", parsed_s[i]);
+	for(i = 0; i <= tokenCnt; i++) {
+		//if token == "|" -> do thing with all previous tokens since last thing done?
+		//if token == ">>"
+		//if token == ">"
+		//if token == "<"
+		//printf("%s\n", tokens[i]);
 	}	
 
 	/* function for error checking */
