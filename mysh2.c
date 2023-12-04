@@ -148,11 +148,16 @@ int redirectOut(char* file, int isAppend) {
 }
 
 int main(int argc, char *argv[]) {
-	int tokenCnt = 0;
-	int tokenIdx = 0;
+	int tokenCnt;
+	int tokenIdx;
 	char* shellInp;
 	char** tokens;
 	char** commands;
+	int commandsIdx;
+	char* file;
+	int fd[2];
+	int fdin;
+	int fdout;
 
 	while(1) {	
 
@@ -174,11 +179,9 @@ int main(int argc, char *argv[]) {
 		if(commands == NULL) {
 			break;
 		}
-		int commandsIdx = 0;
-		char* file;
-		int fd[2];
-		int fdin = STDIN_FILENO;
-		int fdout = STDOUT_FILENO;
+		commandsIdx = 0;
+		fdin = STDIN_FILENO;
+		fdout = STDOUT_FILENO;
 
 		/* User specifies to exit so exit after freeing */
 		if(strcmp(tokens[0], "exit") == 0) {
