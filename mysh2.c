@@ -103,6 +103,7 @@ int forkPipe(int fdin, int fdout, char** commands) {
 			close(fdout);
 		}
 		if (execvp(commands[0], commands) == -1) {
+			perror("bash");
 			return -1;
 		}
 	} 
@@ -148,42 +149,58 @@ int redirectOut(char* file, int isAppend) {
 }
 
 int main(int argc, char *argv[]) {
+	
+	/* Raw input */
+	char* shellInp;
+
+	/* Parsed buffer tracking vars */
 	int tokenCnt;
 	int tokenIdx;
-	char* shellInp;
 	char** tokens;
+	
+	/* Buffer to hold things being executed at given time */
 	char** commands;
 	int commandsIdx;
+	
+	/* File involved in redirection */
 	char* file;
+
+	/* Fd for our piping and redirection purposes */
 	int fd[2];
 	int fdin;
 	int fdout;
 
 	while(1) {	
 
-		/* Read and parse input */
+		/* Read and parse input after reset of tracking vars */
 		tokenCnt = 0;
 		tokenIdx = 0;
 		shellInp = readInp();
+
+		/* Rerun fgets again cuz user didn't do anything with \n */
 		if(strcmp(shellInp, "\n") == 0) {
 			free(shellInp);
 			continue;
 		}
+
+		/* Parse user input */
 		tokens = parseInp(shellInp, &tokenCnt);
 		if(tokens == NULL) {
 			break;
 		}
 	
 		/* Prep for iterating over tokens and placing in buffer to execute, ready for piping */
+		commandsIdx = 0;
 		commands = malloc(sizeof(char*) * (COMMAND_LIMIT + 1));
 		if(commands == NULL) {
 			break;
 		}
-		commandsIdx = 0;
+
+		/* Our initial piping ends */
 		fdin = STDIN_FILENO;
 		fdout = STDOUT_FILENO;
 
-		/* User specifies to exit so exit after freeing */
+		/* User specifies to exit, so exit after freeing */
 		if(strcmp(tokens[0], "exit") == 0) {
 			for(tokenIdx = 0; tokenIdx <= tokenCnt; tokenIdx++) {
 				free(tokens[tokenIdx]);
