@@ -260,39 +260,58 @@ int redirectOut(char* file, int isAppend, char **tokens, int tokenCnt, char *she
 }
 
 int main(int argc, char *argv[]) {
-	int tokenCnt = 0;
-	int tokenIdx = 0;
+	
+	/* Raw input */
 	char* shellInp;
+
+	/* Parsed buffer tracking vars */
+	int tokenCnt;
+	int tokenIdx;
 	char** tokens;
+	
+	/* Buffer to hold things being executed at given time */
 	char** commands;
+	int commandsIdx;
+	
+	/* File involved in redirection */
+	char* file;
+
+	/* Fd for our piping and redirection purposes */
+	int fd[2];
+	int fdin;
+	int fdout;
 
 	while(1) {	
 
-		/* Read and parse input */
+		/* Read and parse input after reset of tracking vars */
 		tokenCnt = 0;
 		tokenIdx = 0;
 		shellInp = readInp();
+
+		/* Rerun fgets again cuz user didn't do anything with \n */
 		if(strcmp(shellInp, "\n") == 0) {
 			free(shellInp);
 			continue;
 		}
+
+		/* Parse user input */
 		tokens = parseInp(shellInp, &tokenCnt);
 		if(tokens == NULL) {
 			break;
 		}
 	
 		/* Prep for iterating over tokens and placing in buffer to execute, ready for piping */
+		commandsIdx = 0;
 		commands = malloc(sizeof(char*) * (COMMAND_LIMIT + 1));
 		if(commands == NULL) {
 			break;
 		}
-		int commandsIdx = 0;
-		char* file;
-		int fd[2];
-		int fdin = STDIN_FILENO;
-		int fdout = STDOUT_FILENO;
 
-		/* User specifies to exit so exit after freeing */
+		/* Our initial piping ends */
+		fdin = STDIN_FILENO;
+		fdout = STDOUT_FILENO;
+
+		/* User specifies to exit, so exit after freeing */
 		if(strcmp(tokens[0], "exit") == 0) {
 			for(tokenIdx = 0; tokenIdx <= tokenCnt; tokenIdx++) {
 				free(tokens[tokenIdx]);
@@ -363,3 +382,4 @@ int main(int argc, char *argv[]) {
 	free(commands);
 	exit(EXIT_FAILURE);
 }
+
