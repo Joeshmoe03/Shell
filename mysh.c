@@ -160,15 +160,13 @@ int redirectOut(char* file, int isAppend) {
 }
 
 /* Free allocs & exit */
-void errorHandler(char **tokens, int tokenCnt, char *shellInp, char **commands) {
+void freeAll(char **tokens, int tokenCnt, char *shellInp, char **commands) {
 	for(int tokenIdx = 0; tokenIdx <= tokenCnt; tokenIdx++) {
 		free(tokens[tokenIdx]);
 	}
 	free(shellInp);
 	free(tokens);
 	free(commands);
-
-	exit(EXIT_FAILURE);
 }
 
 int main(int argc, char *argv[]) {
@@ -241,7 +239,8 @@ int main(int argc, char *argv[]) {
 				commands[commandsIdx] = NULL;
 				fdin = redirectIn(file);
 				if(fdin < 0) {
-					errorHandler(tokens, tokenCnt, shellInp, commands);
+					freeAll(tokens, tokenCnt, shellInp, commands);
+					continue;
 				}
 				tokenIdx++;
 			}
@@ -249,7 +248,8 @@ int main(int argc, char *argv[]) {
 				commands[commandsIdx] = NULL;
 				fdout = redirectOut(file, 0);
 				if(fdout < 0) {
-					errorHandler(tokens, tokenCnt, shellInp, commands);
+					freeAll(tokens, tokenCnt, shellInp, commands);
+					continue;
 				}
 				tokenIdx++;
 			}
@@ -257,7 +257,8 @@ int main(int argc, char *argv[]) {
 				commands[commandsIdx] = NULL;
 				fdout = redirectOut(file, 1);
 				if(fdout < 0) {
-					errorHandler(tokens, tokenCnt, shellInp, commands);
+					freeAll(tokens, tokenCnt, shellInp, commands);
+					continue;
 				}
 				tokenIdx++;
 			}
@@ -265,10 +266,12 @@ int main(int argc, char *argv[]) {
 				commands[commandsIdx] = NULL;
 				if (pipe(fd) < 0) {
 					perror("pipe");
-					errorHandler(tokens, tokenCnt, shellInp, commands);
+					freeAll(tokens, tokenCnt, shellInp, commands);
+					continue;
 				}
 				if (forkPipe(fdin, fd[1], commands) < 0) {
-					errorHandler(tokens, tokenCnt, shellInp, commands);
+					freeAll(tokens, tokenCnt, shellInp, commands);
+					continue;
 				}
 				close(fd[1]);
 				fdin = fd[0];
@@ -286,13 +289,15 @@ int main(int argc, char *argv[]) {
 		if(fdout != STDOUT_FILENO) {
 			if(close(fdout) < 0) {
 				perror("mysh");
-				errorHandler(tokens, tokenCnt, shellInp, commands);
+				freeAll(tokens, tokenCnt, shellInp, commands);
+				continue;
 			}
 		}	
 		if(fdin != STDIN_FILENO) {
 			if(close(fdin) < 0) {
 				perror("mysh");
-				errorHandler(tokens, tokenCnt, shellInp, commands);
+				freeAll(tokens, tokenCnt, shellInp, commands);
+				continue;
 			}
 		}
 
@@ -306,6 +311,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	/* If we break out of loop we go here and indicate failure */
-	errorHandler(tokens, tokenCnt, shellInp, commands);
+	freeAll(tokens, tokenCnt, shellInp, commands);
+	exit(EXIT_FAILURE);
 }
 
