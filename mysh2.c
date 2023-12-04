@@ -27,12 +27,12 @@ char* readInp(void) {
 		/* A problem occured with fgets */
 		if(errno != 0) {
 			free(shellInp);
-			exit(1);
+			exit(EXIT_FAILURE);
 		}
 		/* User did CTRL-D */
 		else {
 			free(shellInp);
-			exit(0);
+			exit(EXIT_SUCCESS);
 		}
 	}
 	return shellInp;
@@ -71,7 +71,7 @@ char** parseInp(char* shellInp, int* tokenCntAddr) {
 			tokenSiz = tmpTokenSiz;
 		}
 	
-		/* malloc of token is +1 for \0 */
+		/* Malloc of token is +1 for \0 */
 		tokens[tokenIdx] = malloc(sizeof(char) * (strlen(token) + 1));
 		
 		/* If the malloc fails, free everything and return */
@@ -89,46 +89,160 @@ char** parseInp(char* shellInp, int* tokenCntAddr) {
 	return tokens;
 }
 
-int forkPipe(int fdin, int fdout, char** commands) {
-	int exitStatus;
-	pid_t pid;
+/* Error Check Functions! */
+void forkErrChk(int childPid, char **tokens, int tokenCnt, char *shellInp, char **commands) {
 
-	if((pid = fork()) == 0) {
+	if(childPid < 0) {
+		/* Free allocs */
+		for(int tokenIdx = 0; tokenIdx <= tokenCnt; tokenIdx++) {
+			free(tokens[tokenIdx]);
+		}
+		free(shellInp);
+		free(tokens);
+		free(commands);
+
+	/* Error message & exit */
+		perror("fork");
+		exit(EXIT_FAILURE);
+	}
+}
+
+void execErrChk(char **tokens, int tokenCnt, char *shellInp, char **commands) {
+
+	/* Free allocs */
+	for(int tokenIdx = 0; tokenIdx <= tokenCnt; tokenIdx++) {
+		free(tokens[tokenIdx]);
+	}
+	free(shellInp);
+	free(tokens);
+	free(commands);
+
+	/* Error message & exit */
+	perror("mysh");
+	exit(EXIT_FAILURE);
+}
+
+void waitErrChk(int exitPid, char **tokens, int tokenCnt, char *shellInp, char **commands) {
+	if(exitPid < 0) {
+
+		/* Free allocs */
+		for(int tokenIdx = 0; tokenIdx <= tokenCnt; tokenIdx++) {
+			free(tokens[tokenIdx]);
+		}
+		free(shellInp);
+		free(tokens);
+		free(commands);
+
+		/* Error message & exit */
+		perror("wait");
+		exit(EXIT_FAILURE);
+	}
+}
+
+void dup2ErrChk(int newFd, char **tokens, int tokenCnt, char *shellInp, char **commands) {
+	if(newFd < 0) {
+
+		/* Free allocs */
+		for(int tokenIdx = 0; tokenIdx <= tokenCnt; tokenIdx++) {
+			free(tokens[tokenIdx]);
+		}
+		free(shellInp);
+		free(tokens);
+		free(commands);
+
+		/* Error message & exit */
+		perror("dup2");
+		exit(EXIT_FAILURE);
+	}
+}
+
+void pipeWithErrChk(int retVal, char **tokens, int tokenCnt, char *shellInp, char **commands) {
+	if(retVal < 0) {
+
+		/* Free allocs */
+		for(int tokenIdx = 0; tokenIdx <= tokenCnt; tokenIdx++) {
+			free(tokens[tokenIdx]);
+		}
+		free(shellInp);
+		free(tokens);
+		free(commands);
+
+		/* Error message & exit */
+		perror("pipe");
+		exit(EXIT_FAILURE);
+	}
+}
+
+void openErrChk(int fd, char **tokens, int tokenCnt, char *shellInp, char **commands) {
+	if(fd < 0) {
+
+		/* Free allocs */
+		for(int tokenIdx = 0; tokenIdx <= tokenCnt; tokenIdx++) {
+			free(tokens[tokenIdx]);
+		}
+		free(shellInp);
+		free(tokens);
+		free(commands);
+
+		/* Error message & exit */
+		perror("mysh");
+		exit(EXIT_FAILURE);
+	}
+}
+
+void closeWithErrChk(int closeRetVal, char **tokens, int tokenCnt, char *shellInp, char **commands) {
+	if(closeRetVal < 0) {
+
+		/* Free allocs */
+		for(int tokenIdx = 0; tokenIdx <= tokenCnt; tokenIdx++) {
+			free(tokens[tokenIdx]);
+		}
+		free(shellInp);
+		free(tokens);
+		free(commands);
+
+		/* Error message & exit */
+		perror("mysh");
+		exit(EXIT_FAILURE);
+	}
+}
+
+void forkPipe(int fdin, int fdout, char **tokens, int tokenCnt, char *shellInp, char **commands) {
+	__pid_t childPid, exitPid;
+	int exitVal;
+	int newFd;
+
+	childPid = fork();
+	forkErrChk(childPid, tokens, tokenCnt, shellInp, commands);
+	if(childPid == 0) {
 		if(fdin != STDIN_FILENO) {
-			dup2(fdin, STDIN_FILENO);
+			newFd = dup2(fdin, STDIN_FILENO);
+			dup2ErrChk(newFd, tokens, tokenCnt, shellInp, commands);
 			close(fdin);
 		}
 		if(fdout != STDOUT_FILENO) {
-			dup2(fdout, STDOUT_FILENO);
+			newFd = dup2(fdout, STDOUT_FILENO);
+			dup2ErrChk(newFd, tokens, tokenCnt, shellInp, commands);
 			close(fdout);
 		}
-		if (execvp(commands[0], commands) == -1) {
-			return -1;
-		}
+		execvp(commands[0], commands);
+		execErrChk(tokens, tokenCnt, shellInp, commands);
 	} 
-	else if (pid < 0) {
-		return -1;
-	} 
-	else {
-		waitpid(pid, &exitStatus, 0);
-	}
-	return pid;
+	exitPid = wait(&exitVal);
+	waitErrChk(exitPid, tokens, tokenCnt, shellInp, commands);
 }
 
-int redirectIn(char* file) {
+int redirectIn(char* file, char **tokens, int tokenCnt, char *shellInp, char **commands) {
+
 	int fdin = open(file, O_RDONLY);
+	openErrChk(fdin, tokens, tokenCnt, shellInp, commands);
 	
-	/* Check that opening file succeeded else throw error */
-	if(fdin == -1) {
-		perror("open");
-		return -1;
-	}
 	return fdin;
 }
 
-int redirectOut(char* file, int isAppend) {
+int redirectOut(char* file, int isAppend, char **tokens, int tokenCnt, char *shellInp, char **commands) {
 	int fdout;
-	
+
 	/* User specifies to append rather than trunc */
 	if(isAppend == 1) {
 		fdout = open(file, O_WRONLY | O_CREAT | O_APPEND, 0666); 
@@ -140,10 +254,8 @@ int redirectOut(char* file, int isAppend) {
 	}
 	
 	/* Check that open succeeded else throw error */
-	if(fdout == -1) {
-		perror("open");
-		return -1;
-	}
+	openErrChk(fdout, tokens, tokenCnt, shellInp, commands);
+
 	return fdout;
 }
 
@@ -188,31 +300,31 @@ int main(int argc, char *argv[]) {
 			free(shellInp);
 			free(tokens);
 			free(commands);
-			exit(0);
+			exit(EXIT_SUCCESS);
 		}
 	
 		/* Get corresponding tokens and do the right things on those tokens between pipes/redirects */
 		for(tokenIdx = 0; tokenIdx <= tokenCnt; tokenIdx++) {
 			file = tokens[tokenIdx + 1];
 			if(strcmp(tokens[tokenIdx], "<") == 0) {
-				commands[commandsIdx] = NULL; //TODO: ERROR HANDLING WITH FREE
-				fdin = redirectIn(file);
+				commands[commandsIdx] = NULL;
+				fdin = redirectIn(file, tokens, tokenCnt, shellInp, commands);
 				tokenIdx++;
 			}
 			else if(strcmp(tokens[tokenIdx], ">") == 0) {
 				commands[commandsIdx] = NULL;
-				fdout = redirectOut(file, 0); //TODO: ERROR HANDLING WITH FREE
+				fdout = redirectOut(file, 0, tokens, tokenCnt, shellInp, commands);
 				tokenIdx++;
 			}
 			else if(strcmp(tokens[tokenIdx], ">>") == 0) {
 				commands[commandsIdx] = NULL;
-				fdout = redirectOut(file, 1); //TODO: ERROR HANDLING WITH FREE
+				fdout = redirectOut(file, 1, tokens, tokenCnt, shellInp, commands);
 				tokenIdx++;
 			}
 			else if(strcmp(tokens[tokenIdx], "|") == 0) {
 				commands[commandsIdx] = NULL;
-				pipe(fd);
-				forkPipe(fdin, fd[1], commands); //TODO: ERROR HANDLING WITH FREE
+				pipeWithErrChk(pipe(fd), tokens, tokenCnt, shellInp, commands);
+				forkPipe(fdin, fd[1], tokens, tokenCnt, shellInp, commands);
 				close(fd[1]);
 				fdin = fd[0];
 				commandsIdx = 0;
@@ -223,12 +335,14 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		commands[commandsIdx] = NULL;
-		forkPipe(fdin, fdout, commands); //TODO: ERROR HANDLING WITH FREE
+		forkPipe(fdin, fdout, tokens, tokenCnt, shellInp, commands); //TODO: ERROR HANDLING WITH FREE
+
+		/* Close opened file descriptors */
 		if(fdout != STDOUT_FILENO) {
-			close(fdout);
+			closeWithErrChk(close(fdout), tokens, tokenCnt, shellInp, commands);
 		}	
 		if(fdin != STDIN_FILENO) {
-			close(fdin);
+			closeWithErrChk(close(fdout), tokens, tokenCnt, shellInp, commands);
 		}
 
 		/* Free at the end */	
@@ -247,5 +361,5 @@ int main(int argc, char *argv[]) {
 	free(shellInp);
 	free(tokens);
 	free(commands);
-	exit(1);
+	exit(EXIT_FAILURE);
 }
