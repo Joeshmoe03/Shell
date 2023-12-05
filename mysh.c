@@ -104,27 +104,29 @@ int forkPipe(int fdin, int fdout, char **commands) {
 		if(fdin != STDIN_FILENO) {
 			if(dup2(fdin, STDIN_FILENO) < 0) {
 				perror("dup2");
-				return -1;
+				exit(EXIT_FAILURE);
 			}
 			close(fdin);
 		}
 		if(fdout != STDOUT_FILENO) {
 			if(dup2(fdout, STDOUT_FILENO) < 0) {
 				perror("dup2");
-				return -1;
+				exit(EXIT_FAILURE);
 			}
 			close(fdout);
 		}
-		execvp(commands[0], commands);
-		perror("mysh");
-		return -1;
+
+		/* If exec in child fails, we MUST exit... We don't want to run rest of main... */
+		if(execvp(commands[0], commands) < 0) {
+			perror("mysh");
+			exit(EXIT_FAILURE); 
+		}
 	} 
 	exitPid = wait(&exitVal);
 	if (exitPid < 0) {
 		perror("dup2");
 		return -1;
 	}
-	
 	return 0;
 }
 
@@ -134,7 +136,6 @@ int redirectIn(char* file) {
 		perror("mysh");
 		return -1;
 	}
-
 	return fdin;
 }
 
@@ -150,12 +151,10 @@ int redirectOut(char* file, int isAppend) {
 	else {
 		fdout = open(file, O_WRONLY | O_CREAT | O_TRUNC, 0666);
 	}
-	
 	if (fdout < 0) {
 		perror("mysh");
 		return -1;
 	}
-
 	return fdout;
 }
 
@@ -167,6 +166,16 @@ void freeAll(char **tokens, int tokenCnt, char *shellInp, char **commands) {
 	free(shellInp);
 	free(tokens);
 	free(commands);
+}
+
+/* Close all fd */
+void closeAll(int fdin, int fdout) {
+	if(fdin != STDIN_FILENO) {
+		close(fdin);
+	}
+	if(fdout != STDOUT_FILENO) {
+		close(fdout);
+	}
 }
 
 int main(int argc, char *argv[]) {
@@ -188,8 +197,8 @@ int main(int argc, char *argv[]) {
 
 	/* Fd for our piping and redirection purposes */
 	int fd[2];
-	int fdin;
-	int fdout;
+	int fdin = STDIN_FILENO;
+	int fdout = STDOUT_FILENO;
 
 	while(1) {	
 
@@ -223,12 +232,7 @@ int main(int argc, char *argv[]) {
 
 		/* User specifies to exit, so exit after freeing */
 		if(strcmp(tokens[0], "exit") == 0) {
-			for(tokenIdx = 0; tokenIdx <= tokenCnt; tokenIdx++) {
-				free(tokens[tokenIdx]);
-			}
-			free(shellInp);
-			free(tokens);
-			free(commands);
+			freeAll(tokens, tokenCnt, shellInp, commands);
 			exit(EXIT_SUCCESS);
 		}
 	
@@ -238,40 +242,45 @@ int main(int argc, char *argv[]) {
 			if(strcmp(tokens[tokenIdx], "<") == 0) {
 				commands[commandsIdx] = NULL;
 				fdin = redirectIn(file);
+
+				/* If the user attempts a redirect on a file w/o permissions for ex., don't just throw them out of shell by exit. Try again */
 				if(fdin < 0) {
-					freeAll(tokens, tokenCnt, shellInp, commands);
-					continue;
+					break;
 				}
 				tokenIdx++;
 			}
 			else if(strcmp(tokens[tokenIdx], ">") == 0) {
 				commands[commandsIdx] = NULL;
 				fdout = redirectOut(file, 0);
+
+				/* If the user attempts a redirect on a file w/o permissions, don't just throw them out of shell by exit. Try again */
 				if(fdout < 0) {
-					freeAll(tokens, tokenCnt, shellInp, commands);
-					continue;
+					break;
 				}
 				tokenIdx++;
 			}
 			else if(strcmp(tokens[tokenIdx], ">>") == 0) {
 				commands[commandsIdx] = NULL;
 				fdout = redirectOut(file, 1);
+
+				/* If the user attempts a redirect on a file w/o permissions, don't just throw them out of shell by exit. Try again */
 				if(fdout < 0) {
-					freeAll(tokens, tokenCnt, shellInp, commands);
-					continue;
+					break;
 				}
 				tokenIdx++;
 			}
 			else if(strcmp(tokens[tokenIdx], "|") == 0) {
 				commands[commandsIdx] = NULL;
+
+				/* Similar error handle rationale, but due to resource constraints. */
 				if (pipe(fd) < 0) {
 					perror("pipe");
-					freeAll(tokens, tokenCnt, shellInp, commands);
-					continue;
+					break;
 				}
+			
+				/* Attempts to fork process and exec on pipe. Like real shell, fork failure should not boot us w/ exit. */
 				if (forkPipe(fdin, fd[1], commands) < 0) {
-					freeAll(tokens, tokenCnt, shellInp, commands);
-					continue;
+					break;
 				}
 				close(fd[1]);
 				fdin = fd[0];
@@ -283,35 +292,18 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		commands[commandsIdx] = NULL;
-		forkPipe(fdin, fdout, commands);
-
-		/* Close opened file descriptors */
-		if(fdout != STDOUT_FILENO) {
-			if(close(fdout) < 0) {
-				perror("mysh");
-				freeAll(tokens, tokenCnt, shellInp, commands);
-				continue;
-			}
-		}	
-		if(fdin != STDIN_FILENO) {
-			if(close(fdin) < 0) {
-				perror("mysh");
-				freeAll(tokens, tokenCnt, shellInp, commands);
-				continue;
-			}
+		
+		/* If some redirection failed, don't forkPipe */
+		if(fdin >= 0 && fdout >= 0) {
+			forkPipe(fdin, fdout, commands);
 		}
-
-		/* Free at the end */	
-		for(tokenIdx = 0; tokenIdx <= tokenCnt; tokenIdx++) {
-			free(tokens[tokenIdx]);
-		}
-		free(shellInp);
-		free(tokens);
-		free(commands);
+		/* Free at the end or if broke out of inner for loop */
+		closeAll(fdin, fdout);
+		freeAll(tokens, tokenCnt, shellInp, commands);
 	}
 
-	/* If we break out of loop we go here and indicate failure */
+	/* If we break out of while(1) loop we go here and indicate failure */
+	closeAll(fdin, fdout);
 	freeAll(tokens, tokenCnt, shellInp, commands);
 	exit(EXIT_FAILURE);
 }
-
