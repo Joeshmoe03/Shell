@@ -313,7 +313,7 @@ int main(int argc, char *argv[]) {
 		freeAll(tokens, tokenCnt, shellInp, commands);
 	}
 
-	/* If we break out of while(1) loop we go here and indicate failure */
+	/* If we break out of while(1) loop, we go here and indicate failure */
 	closeAll(fdin, fdout);
 	freeAll(tokens, tokenCnt, shellInp, commands);
 	exit(EXIT_FAILURE);
