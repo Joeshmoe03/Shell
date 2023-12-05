@@ -90,8 +90,8 @@ char** parseInp(char* shellInp, int* tokenCntAddr) {
 	return tokens;
 }
 
-
-int forkPipe(int fdin, int fdout, char **commands) {
+/* Goes off and forks new process for execution of a command, parent waits on forked child */
+int execCommand(int fdin, int fdout, char **commands) {
 	__pid_t childPid, exitPid;
 	int exitVal;
 
@@ -100,7 +100,12 @@ int forkPipe(int fdin, int fdout, char **commands) {
 		perror("fork");
 		return -1;
 	}
+
+	/* Execution of child is under this condition */
 	if(childPid == 0) {
+	
+		/* Input comes from fd specified by previous program and stdin if no piping/first executed.
+ 		 * Input goes from fdin to stdin and closes fdin */
 		if(fdin != STDIN_FILENO) {
 			if(dup2(fdin, STDIN_FILENO) < 0) {
 				perror("dup2");
@@ -108,6 +113,9 @@ int forkPipe(int fdin, int fdout, char **commands) {
 			}
 			close(fdin);
 		}
+
+		/* Output comes from fd specified by previous program and stdout if no piping/first executed.
+ 		 * Out goes from fdout to stdout and closes fdout */
 		if(fdout != STDOUT_FILENO) {
 			if(dup2(fdout, STDOUT_FILENO) < 0) {
 				perror("dup2");
@@ -116,12 +124,14 @@ int forkPipe(int fdin, int fdout, char **commands) {
 			close(fdout);
 		}
 
-		/* If exec in child fails, we MUST exit... We don't want to run rest of main... */
+		/* If exec (attempts to execute commands) in child fails, we MUST exit... We don't want to run rest of main... */
 		if(execvp(commands[0], commands) < 0) {
 			perror("mysh");
 			exit(EXIT_FAILURE); 
 		}
 	} 
+
+	/* Parent job is to wait on child process to finish to resume execution of shell */
 	exitPid = wait(&exitVal);
 	if (exitPid < 0) {
 		perror("dup2");
@@ -278,8 +288,9 @@ int main(int argc, char *argv[]) {
 					break;
 				}
 			
-				/* Attempts to fork process and exec on pipe. Like real shell, fork failure should not boot us w/ exit. */
-				if (forkPipe(fdin, fd[1], commands) < 0) {
+				/* Attempts to fork process and exec on pipe. Like real shell, fork failure should not boot us w/ exit. Closes fd after, 
+ 				 * so no process left behind */
+				if (execCommand(fdin, fd[1], commands) < 0) {
 					break;
 				}
 				close(fd[1]);
@@ -293,9 +304,9 @@ int main(int argc, char *argv[]) {
 		}
 		commands[commandsIdx] = NULL;
 		
-		/* If some redirection failed, don't forkPipe */
+		/* If some redirection failed, don't execCommand */
 		if(fdin >= 0 && fdout >= 0) {
-			forkPipe(fdin, fdout, commands);
+			execCommand(fdin, fdout, commands);
 		}
 		/* Free at the end or if broke out of inner for loop */
 		closeAll(fdin, fdout);
