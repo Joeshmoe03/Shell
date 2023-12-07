@@ -92,8 +92,7 @@ char** parseInp(char* shellInp, int* tokenCntAddr) {
 
 /* Goes off and forks new process for execution of a command, parent waits on forked child */
 int execCommand(int fdin, int fdout, char **commands) {
-	__pid_t childPid, exitPid;
-	int exitVal;
+	__pid_t childPid;
 
 	childPid = fork();
 	if(childPid < 0) {
@@ -131,12 +130,12 @@ int execCommand(int fdin, int fdout, char **commands) {
 		}
 	} 
 
-	/* Parent job is to wait on child process to finish to resume execution of shell */
-	exitPid = wait(&exitVal);
-	if (exitPid < 0) {
-		perror("dup2");
-		return -1;
-	}
+	/* Parent job is to wait on child process to finish to resume execution of shell - TODO: is taking this away fine? */
+	// exitPid = wait(&exitVal);
+	// if (exitPid < 0) {
+	// 	perror("wait");
+	// 	return -1;
+	// }
 	return 0;
 }
 
@@ -181,10 +180,14 @@ void freeAll(char **tokens, int tokenCnt, char *shellInp, char **commands) {
 /* Close all fd */
 void closeAll(int fdin, int fdout) {
 	if(fdin != STDIN_FILENO) {
-		close(fdin);
+		if(close(fdin) < 0) {
+			perror("close");
+		}
 	}
 	if(fdout != STDOUT_FILENO) {
-		close(fdout);
+		if(close(fdout) < 0) {
+			perror("close");
+		}
 	}
 }
 
@@ -236,15 +239,20 @@ int main(int argc, char *argv[]) {
 			break;
 		}
 
-		/* Our initial piping ends */
-		fdin = STDIN_FILENO;
-		fdout = STDOUT_FILENO;
-
 		/* User specifies to exit, so exit after freeing */
 		if(strcmp(tokens[0], "exit") == 0) {
 			freeAll(tokens, tokenCnt, shellInp, commands);
 			exit(EXIT_SUCCESS);
 		}
+
+		/* Our initial piping ends */
+		fdin = STDIN_FILENO;
+		fdout = STDOUT_FILENO;
+
+		/* Info needed for waiting on children processes */
+		__pid_t exitPid; 
+		int exitVal;
+		int pipeCtr = 0;
 	
 		/* Get corresponding tokens and do the right things on those tokens between pipes/redirects */
 		for(tokenIdx = 0; tokenIdx <= tokenCnt; tokenIdx++) {
@@ -280,6 +288,7 @@ int main(int argc, char *argv[]) {
 				tokenIdx++;
 			}
 			else if(strcmp(tokens[tokenIdx], "|") == 0) {
+				pipeCtr++;
 				commands[commandsIdx] = NULL;
 
 				/* Similar error handle rationale, but due to resource constraints. */
@@ -304,10 +313,20 @@ int main(int argc, char *argv[]) {
 		}
 		commands[commandsIdx] = NULL;
 		
-		/* If some redirection failed, don't execCommand */
+		/* If some redirection failed, don't execCommand. Otherwise execCommand */
 		if(fdin >= 0 && fdout >= 0) {
 			execCommand(fdin, fdout, commands);
 		}
+	
+		/* Loop for waiting on child processes */
+		for(int p = 0; p <= pipeCtr; p++) {
+			exitPid = wait(&exitVal);
+			if (exitPid < 0) {
+				perror("wait");
+				break;
+			}
+		}	
+		
 		/* Free at the end or if broke out of inner for loop */
 		closeAll(fdin, fdout);
 		freeAll(tokens, tokenCnt, shellInp, commands);
