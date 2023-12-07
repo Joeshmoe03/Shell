@@ -129,13 +129,6 @@ int execCommand(int fdin, int fdout, char **commands) {
 			exit(EXIT_FAILURE); 
 		}
 	} 
-
-	/* Parent job is to wait on child process to finish to resume execution of shell - TODO: is taking this away fine? */
-	// exitPid = wait(&exitVal);
-	// if (exitPid < 0) {
-	// 	perror("wait");
-	// 	return -1;
-	// }
 	return 0;
 }
 
